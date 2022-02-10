@@ -142,12 +142,14 @@
     <ClInclude Include="6502Sim.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Memory.h" />
+    <ClInclude Include="Processor.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="6502Sim.cpp" />
     <ClCompile Include="Memory.cpp" />
+    <ClCompile Include="Processor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="6502Sim.rc" />
