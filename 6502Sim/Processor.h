@@ -1,4 +1,5 @@
 #pragma once
+#include "Memory.h"
 
 /// <summary>
 /// Processor info references that I'm using: 
@@ -18,6 +19,10 @@ enum ADDRESS_MODES {
 /// </summary>
 enum INSTRUCTIONS {
 	ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC, CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP, JSR, LDA, LDX, LDY, LSR, NOP, ORA, PHA, PHP, PLA, PLP, ROL, ROR, RTI, RTS, SBC, SEC, SED, SEI, STA, STX, STY, TAX, TAY, TSX, TXA, TXA, TXS, TYA, JAM //JAM is being used with all illegal instructions at the moment, which are not implemented at this point, albeit it may be contemplated, at which point I'll need to make custom instructions for them (for things like LAX and SBX instructions)
+};
+
+enum PROCESSOR_STATE {
+	FETCH, DECODE, EXECUTE, JAMMED
 };
 
 
@@ -99,11 +104,12 @@ private:
 	unsigned char x_reg; //index x
 	unsigned char y_reg; //index y
 	unsigned char sp_reg; //stack pointer
+	sflag_reg flags;
 	
 	
 						  
 	/// <summary>
-	/// Another union, this one is for the data lines for an instruction (note that this is a theoretical thing, the actual processor uses data pins for both input and output on the same bus, I may or may not include a io_data line, but this instruction structure will be used for quickly parsing commands
+	/// Another union, this one is for the data lines for an instruction (note that this is a theoretical thing, the actual processor uses data pins for both input and output on the same bus, I may or may not include a io_data line, but this instruction structure will be used for quickly parsing commands, no instantiation needed here, I'll use it in the function for decoding
 	/// </summary>
 	union instruction {
 		struct {
@@ -113,15 +119,42 @@ private:
 		unsigned char val; 
 	};
 	
-	bool read_write; //a boolean value for reading and writing (0 = read, 1 = write), not sure if I'm going to need this yet, but I've got it here just in case
+	bool read_write; //a boolean value for reading and writing (0 = read, 1 = write...maybe, I'm not matching it directly to the hardware specifications), not sure if I'm going to need this yet, but I've got it here just in case
+
+	//RAM and ROM variables (Pointers of course)
+	Memory* ram;
+	Memory* rom;
+
+	//instantion of our processor state
+
+	PROCESSOR_STATE state;
+
+	//internal functions for fetch, decode, and execute 
+	void fetch();
+	void decode();
+	void execute();
 
 public:
 	Processor(); //default constructor, defaults to 2KB RAM/ROM
-	Processor(unsigned int ram_size, unsigned int rom_size); //specific constructor for instantiating a 
+	Processor(unsigned int ram_size, unsigned int rom_size); //specific constructor for instantiating a different size of RAM/ROM
+	~Processor(); // our destructor, which will be used to clear up RAM/ROM pointers
 	//finally, the functions that I'll be able to use from outside the class itself, that the interface and controlling apparatus will use
 	void step(); // this function will be used to initiate the fetch-decode-execute cycle by the processor
 	unsigned char get_output(); //this function will be used to get the resulting output from processor (aka, what would be on the data pins)
-	unsigned short get_address(); //this function will be used to get the address pins readout
+	unsigned char get_address_high(); //this function will be used to get the address pins (high bits)
+	unsigned char get_address_low(); // same for low bits
+	unsigned char get_sflags(); //for getting register status, I can use the unsigned char for this
+	unsigned char get_accumulator(); //get accumulator contents
+	unsigned char get_x(); //for getting x register contents
+	unsigned char get_y(); //same for y
 	bool get_readwrite(); //currently unused, but will be used to get the status of reading/writing pin, can be used if design is changed to implement timing and simulate actual processor hardware function
+	void reset(); //for resetting the CPU to initial status (should be pretty straightforward)
+	const char* get_state(); //will convert the processor state to a string (of some sort, c-style for now, likely will be changed to some Win32 string or something), and return it for the interface
+
+	//functions I'm not sure how to implement yet, but will need
+	//void load_rom(//some sort of file input or something); //I will definitely need some sort of function for loading instructions into the ROM
+	//void get_rom(); //for getting rom values from CPU, unsure of how I'm going to do this right now, but I'll need some sort of function for getting the ROM contents
+	//void get_ram(); //for getting ram values from CPU, unsure of how I'm going to do this right now, but I'll need some sort of function for getting the RAM contents
+	
 };
 

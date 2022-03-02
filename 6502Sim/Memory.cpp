@@ -50,7 +50,7 @@ unsigned short Memory::bytesToArrayOffset(unsigned char offsetHigh, unsigned cha
 	unsigned short retValue = 0x0000; //ensure that the variable is a clean 
 	retValue = offsetHigh;
 	retValue << 8; //shift bits left 8 places (for high bits of address)
-	retValue = retValue | offsetLow; //bitwise or function to add in the low 
+	retValue = retValue | offsetLow; //bitwise or function to add in the low (and yes Visual Studio, bitwise OR was intended)
 
 	return retValue;
 }
