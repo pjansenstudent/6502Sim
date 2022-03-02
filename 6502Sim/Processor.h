@@ -18,7 +18,7 @@ enum ADDRESS_MODES {
 /// an enumeration for the different instructions, to allow me to have instructions conveniently referred to by type rather than instructing each variant of instruction possible
 /// </summary>
 enum INSTRUCTIONS {
-	ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC, CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP, JSR, LDA, LDX, LDY, LSR, NOP, ORA, PHA, PHP, PLA, PLP, ROL, ROR, RTI, RTS, SBC, SEC, SED, SEI, STA, STX, STY, TAX, TAY, TSX, TXA, TXA, TXS, TYA, JAM //JAM is being used with all illegal instructions at the moment, which are not implemented at this point, albeit it may be contemplated, at which point I'll need to make custom instructions for them (for things like LAX and SBX instructions)
+	ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC, CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP, JSR, LDA, LDX, LDY, LSR, NOP, ORA, PHA, PHP, PLA, PLP, ROL, ROR, RTI, RTS, SBC, SEC, SED, SEI, STA, STX, STY, TAX, TAY, TSX, TXA, TXS, TYA, JAM //JAM is being used with all illegal instructions at the moment, which are not implemented at this point, albeit it may be contemplated, at which point I'll need to make custom instructions for them (for things like LAX and SBX instructions)
 };
 
 enum PROCESSOR_STATE {
@@ -118,6 +118,9 @@ private:
 		};
 		unsigned char val; 
 	};
+
+	//value for the current instruction, (not actually present in physical processor, but useful for my purposes as stated above
+	instruction curr_instruction;
 	
 	bool read_write; //a boolean value for reading and writing (0 = read, 1 = write...maybe, I'm not matching it directly to the hardware specifications), not sure if I'm going to need this yet, but I've got it here just in case
 
@@ -133,6 +136,7 @@ private:
 	void fetch();
 	void decode();
 	void execute();
+	void increment_pc();
 
 public:
 	Processor(); //default constructor, defaults to 2KB RAM/ROM

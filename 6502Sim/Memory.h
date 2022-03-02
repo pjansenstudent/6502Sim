@@ -11,7 +11,7 @@ private:
 	unsigned char* _memblock; //I'm using a char as it is a 8-bit variable, which we're going to use, since we're using 8 bit memory slots 
 	unsigned int _memsize; //a variable for storing the size of the memory
 	unsigned short bytesToArrayOffset(unsigned char offsetHigh, unsigned char offsetLow); //a function that will take care of address translation based on two 8-bit inputs, will be needed for addressing, since I can't just char/8 as
-	bool checkAddress(unsigned short addr);
+	bool checkAddress(unsigned short addr); //to ensure the address provided is valid given the size of the Memory
 
 public:
 	Memory(); //default constructor which I will not be using in my case, but there for good practice
