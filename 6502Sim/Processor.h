@@ -4,7 +4,9 @@
 /// <summary>
 /// Processor info references that I'm using: 
 /// https://www.masswerk.at/6502/6502_instruction_set.html //excellent table view of the instruction set and addressing modes, making it very useful for my purposes, a good chunk of the references I'm using will be from here
-/// 
+/// https://www.atarimagazines.com/compute/issue53/047_1_All_About_The_Status_Register.php
+/// http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html //learning the logic behind the 6502 overflow flag, which is signed rather than simply testing to see if result exceeds 0xFF
+/// http://6502.org/tutorials/ //for a whole bunch of primers on all of the details of operations and components of the 6502
 /// </summary>
 
 /// <summary>
@@ -21,6 +23,9 @@ enum INSTRUCTIONS {
 	ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC, CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP, JSR, LDA, LDX, LDY, LSR, NOP, ORA, PHA, PHP, PLA, PLP, ROL, ROR, RTI, RTS, SBC, SEC, SED, SEI, STA, STX, STY, TAX, TAY, TSX, TXA, TXS, TYA, JAM //JAM is being used with all illegal instructions at the moment, which are not implemented at this point, albeit it may be contemplated, at which point I'll need to make custom instructions for them (for things like LAX and SBX instructions)
 };
 
+/// <summary>
+/// Enum for processor state, 
+/// </summary>
 enum PROCESSOR_STATE {
 	FETCH, DECODE, EXECUTE, JAMMED
 };
@@ -83,14 +88,31 @@ private:
 	union sflag_reg {
 		struct {
 			//breakdown of flag register will go here
-			unsigned char n_flag : 1; //negative flag
-			unsigned char o_flag : 1; //overflow flag
-			unsigned char rsvd : 1; //unused reserved bit
-			unsigned char b_flag : 1; //break flag
-			unsigned char d_flag : 1; //decimal flag
+			unsigned char n_flag : 1; //negative flag, common flag, it determines whether operation results in negative number (bit 7 of resultant operation's register is 1)
+			unsigned char o_flag : 1; //overflow flag, detects when a signed overflow has occured (so result is > 127 or < -127, I think is the range), has some interesting logic behind it
+			unsigned char rsvd : 1; //unused reserved bit, it will likely not be used here
+			unsigned char b_flag : 1; //break flag, it likely will not be that necessary for my purposes, as it is essentially used to determine software breaks, but I'll implement the instruction for it, so it does matter
+			unsigned char d_flag : 1; //decimal flag, used for determining whether the processor will operate in decimal mode, also called BCD mode, where operations are done with BCD numbers, not implemented specifically at the moment, but will likely be added after regular binary mode is complete
 			unsigned char id_flag : 1; //interrupt disable flag
-			unsigned char z_flag : 1; //zero flag
-			unsigned char c_flag : 1; //carry flag
+			unsigned char z_flag : 1; //zero flag, very useful flag, determines
+			unsigned char c_flag : 1; //carry flag, used when doing addition/subtraction to ensure that proper results are obtained 
+		};
+		unsigned char val;
+	};
+
+	/// <summary>
+	/// this union will be useful if I need to check individual bits of an operand
+	/// </summary>
+	union byte {
+		struct {
+			unsigned char b7 : 1;
+			unsigned char b6 : 1;
+			unsigned char b5 : 1;
+			unsigned char b4 : 1;
+			unsigned char b3 : 1;
+			unsigned char b2 : 1;
+			unsigned char b1 : 1;
+			unsigned char b0 : 1;
 		};
 		unsigned char val;
 	};
@@ -131,6 +153,9 @@ private:
 	//instantion of our processor state
 
 	PROCESSOR_STATE state;
+
+	//the output lines, which is the result of an operation
+	unsigned char output;
 
 	//internal functions for fetch, decode, and execute 
 	void fetch();

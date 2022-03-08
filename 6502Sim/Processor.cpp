@@ -74,7 +74,7 @@ Processor::~Processor() {
 /// </summary>
 void Processor::fetch() {
 	if (state == FETCH) {
-		curr_instruction = rom->read(pc_high, pc_low);
+		curr_instruction.val = rom->read(pc_high, pc_low);
 
 		state = DECODE;
 	}
@@ -103,40 +103,66 @@ void Processor::decode() {
 /// The major function of the Processor object, this is where instructions are executed and work is actually done
 /// </summary>
 void Processor::execute() {
-	if (state == EXECUTE)[
+	if (state == EXECUTE) {
+		
+		
+		/*
+		Quick Explanation of the logic for the switch,
+		each operation will do it's respective work, however, depending on addressing mode, the way the rom is read may be changed
+		Thus, I'll have to break up each operation that uses multiple addressing modes and set any operands according to the instruction
+		I'll try to reduce redundancy here by separating memory interactions from the actual work
+		*/
 		switch (inst) {
 		case ADC:
+			unsigned char operand = 0x00; //this will be the number that will be used in the addtion
+			
 			switch (addr_mode) {
-				case ACCUMULATOR:
-					break;
-				case ABSOLUTE:
-					break;
-				case ABSOLUTE_X:
-					break;
-				case ABSOLUTE_Y:
-					break;
-				case IMMEDIATE:
-					break;
-				case IMPLIED:
-					break;
-				case INDIRECT:
-					break;
-				case INDIRECT_X:
-					break;
-				case INDIRECT_Y:
-					break;
-				case RELATIVE:
-					break;
-				case ZEROPAGE:
-					break;
-				case ZEROPAGE_X:
-					break;
-				case ZEROPAGE_Y:
-					break;
-				case ERR:
-					state = JAMMED; //jam the processor
-					break;
+			case ABSOLUTE:
+				break;
+			case ABSOLUTE_X:
+				break;
+			case ABSOLUTE_Y:
+				break;
+			case IMMEDIATE:
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
+				break;
+			case IMPLIED:
+				break;
+			case INDIRECT:
+				break;
+			case INDIRECT_X:
+				break;
+			case INDIRECT_Y:
+				break;
+			case ZEROPAGE:
+				break;
+			case ZEROPAGE_X:
+				break;
+			case ZEROPAGE_Y:
+				break;
+			case ERR:
+				state = JAMMED; //jam the processor
+				break;
 			}
+			
+			if (flags.d_flag == 0) {
+				//the 6502 has an interesting overflow flag, and it's relationship with the other flags. Basically, it checks to see if overflow occurs on SIGNED math, rather than unsigned, meaning I can't just check for a normal overflow for 
+			
+				//As far as I'm aware, the carry bit should be pretty simple, we just need to factor in the current carry bit, and determine whether we got a carry bit
+				if (a_reg + operand + ((flags.c_flag == 0b1)?0x01:0x00) > 0xFF) {
+					flags.c_flag = 0b1; //set carry
+				}
+				else {
+					flags.c_flag = 0b0; //clear carry
+				}
+				a_reg += operand; //do the addition for the actual value in the accumulator
+			}
+			else {
+				//decimal mode addition and arithmetic not yet implemented
+			}
+			
+			
 			break;
 		case AND:
 			switch (addr_mode) {
@@ -149,6 +175,8 @@ void Processor::execute() {
 			case ABSOLUTE_Y:
 				break;
 			case IMMEDIATE:
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
 				break;
 			case IMPLIED:
 				break;
@@ -170,6 +198,16 @@ void Processor::execute() {
 				state = JAMMED; //jam the processor
 				break;
 			}
+			a_reg = a_reg & operand; //bitwise and the operand and the accumulator
+
+			//calculate whether flags are set: Negative and Zero flags specifically
+			if (a_reg = 0x00) {
+				flags.z_flag = 0b1;
+			}
+			if ((a_reg & 0x80) > 0x00) {
+				flags.n_flag = 0b1;
+			}
+			increment_pc(); //finally, increment program counter for next instruction
 			break;
 		case ASL:
 			switch (addr_mode) {
@@ -877,12 +915,26 @@ void Processor::execute() {
 			state = FETCH;
 		}
 		increment_pc(); //increase the pc for the next instruction
-	] else {
+	} else {
 		//state error correcting here, 
 	}
 }
 
-
+/// <summary>
+/// This function is used to increment the Program Counter registers, it also handles any cases for overflow
+/// I think it could be possible to just use ++ for the increment, as it should overflow, however I've decided to play it safe for now
+/// </summary>
 void Processor::increment_pc() {
-
+	if (pc_low + 0x01 > 0xFF) {
+		pc_low = 0x00;
+		if (pc_high + 0x01 > 0xFF) {
+			pc_high = 0x00;
+		}
+		else {
+			pc_high += 0x01;
+		}
+	}
+	else {
+		pc_low += 0x01;
+	}
 }
