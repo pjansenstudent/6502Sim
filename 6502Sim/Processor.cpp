@@ -92,7 +92,7 @@ void Processor::decode() {
 		inst = instruction_table[curr_instruction.nib_high][curr_instruction.nib_low];
 		addr_mode = address_table[curr_instruction.nib_high][curr_instruction.nib_low];
 
-		state == EXECUTE;
+		state = EXECUTE;
 	}
 	else {
 		//need to put some error handling for JAM state or wrong state here.
@@ -113,11 +113,11 @@ void Processor::execute() {
 		I'll try to reduce redundancy here by separating memory interactions from the actual work
 		*/
 		switch (inst) {
-		case ADC:
+		case ADC: {
 			unsigned char operand = 0x00; //this will be the number that will be used in the addtion
-			
+
 			switch (addr_mode) {
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -145,12 +145,12 @@ void Processor::execute() {
 				state = JAMMED; //jam the processor
 				break;
 			}
-			
+
 			if (flags.d_flag == 0) {
 				//the 6502 has an interesting overflow flag, and it's relationship with the other flags. Basically, it checks to see if overflow occurs on SIGNED math, rather than unsigned, meaning I can't just check for a normal overflow for 
-			
+
 				//As far as I'm aware, the carry bit should be pretty simple, we just need to factor in the current carry bit, and determine whether we got a carry bit
-				if (a_reg + operand + ((flags.c_flag == 0b1)?0x01:0x00) > 0xFF) {
+				if (a_reg + operand + ((flags.c_flag == 0b1) ? 0x01 : 0x00) > 0xFF) {
 					flags.c_flag = 0b1; //set carry
 				}
 				else {
@@ -161,14 +161,16 @@ void Processor::execute() {
 			else {
 				//decimal mode addition and arithmetic not yet implemented
 			}
-			
-			
+
+		}
 			break;
 		case AND:
+		{
+			unsigned char operand = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -186,7 +188,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -208,12 +210,14 @@ void Processor::execute() {
 				flags.n_flag = 0b1;
 			}
 			increment_pc(); //finally, increment program counter for next instruction
+
+		}
 			break;
 		case ASL:
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -229,7 +233,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -252,7 +256,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -268,7 +272,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -306,7 +310,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -322,7 +326,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -339,7 +343,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -355,7 +359,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -372,7 +376,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -388,7 +392,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -405,7 +409,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -421,7 +425,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -442,7 +446,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -458,7 +462,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -475,7 +479,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -491,7 +495,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -516,7 +520,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -532,7 +536,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -549,7 +553,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -565,7 +569,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -582,7 +586,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -598,7 +602,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -615,7 +619,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -631,7 +635,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -650,7 +654,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -666,7 +670,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -691,7 +695,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -707,7 +711,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -724,7 +728,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -740,7 +744,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -761,7 +765,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -777,7 +781,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -800,7 +804,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -816,7 +820,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -833,7 +837,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -849,7 +853,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -866,7 +870,7 @@ void Processor::execute() {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
-			case ABSOLUTE:
+			case ABSOLUT:
 				break;
 			case ABSOLUTE_X:
 				break;
@@ -882,7 +886,7 @@ void Processor::execute() {
 				break;
 			case INDIRECT_Y:
 				break;
-			case RELATIVE:
+			case RELATIV:
 				break;
 			case ZEROPAGE:
 				break;
@@ -908,7 +912,7 @@ void Processor::execute() {
 		case TYA:
 			break;
 		case JAM:
-			state == JAMMED; //jam the processor state
+			state = JAMMED; //jam the processor state
 			break;
 		}
 		if (state != JAMMED) {

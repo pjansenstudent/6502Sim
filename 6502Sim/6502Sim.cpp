@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "6502Sim.h"
+#include "Processor.h" 
 
 #define MAX_LOADSTRING 100
 
@@ -26,6 +27,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // TODO: Place code here.
+
+    //Likely this is where the backend code will be initialized and stuff (IE, where our processor class and such will be implemented
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -147,6 +150,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: Add any drawing code that uses hdc here...
+
+            //this is where I think I'll be adding my elements to the code
+
             EndPaint(hWnd, &ps);
         }
         break;
