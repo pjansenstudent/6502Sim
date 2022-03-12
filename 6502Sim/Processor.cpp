@@ -148,15 +148,29 @@ void Processor::execute() {
 
 			if (flags.d_flag == 0) {
 				//the 6502 has an interesting overflow flag, and it's relationship with the other flags. Basically, it checks to see if overflow occurs on SIGNED math, rather than unsigned, meaning I can't just check for a normal overflow for 
+				//using the formula from http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html, we can implement it in C++ rather easily, this should allow the addition to take place
+				if (!(a_reg ^ operand) && (a_reg ^ (a_reg + operand))) {
 
-				//As far as I'm aware, the carry bit should be pretty simple, we just need to factor in the current carry bit, and determine whether we got a carry bit
+				}
+				//As far as I'm aware, the carry bit should be pretty simple, we just need to factor in the current carry bit, and determine whether we got a carry bit, did it in ternary because it's nice and clean
 				if (a_reg + operand + ((flags.c_flag == 0b1) ? 0x01 : 0x00) > 0xFF) {
 					flags.c_flag = 0b1; //set carry
 				}
 				else {
-					flags.c_flag = 0b0; //clear carry
+					flags.c_flag = 0b0; //clear carry, I think this makes sense, as carry should always be the carry bit
 				}
 				a_reg += operand; //do the addition for the actual value in the accumulator
+
+				//checks for n and z flags
+				if (a_reg = 0x00) {
+					flags.z_flag = 0b1;
+				}
+				if ((a_reg & 0x80) > 0x00) {
+					flags.n_flag = 0b1;
+				}
+
+				//finally, increment the pc
+				increment_pc();
 			}
 			else {
 				//decimal mode addition and arithmetic not yet implemented
@@ -213,38 +227,150 @@ void Processor::execute() {
 
 		}
 			break;
-		case ASL:
+		case ASL: {
 			switch (addr_mode) {
 			case ACCUMULATOR:
+			{
+				
+				
+				//perform bit-shift
+				a_reg = a_reg << 1;
+				
+				//check result for zero and negative results
+				if (a_reg == 0x00) {
+					flags.z_flag = 0b1;
+				}
+				if ((a_reg & 0x80) > 0) {
+					flags.n_flag = 0b1;
+				}
+			}
 				break;
 			case ABSOLUT:
+			{
+				unsigned char op_high = 0x00;
+				unsigned char op_low = 0x00;
+				unsigned char result = 0x00;
+				increment_pc();
+				op_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				op_high = rom->read(pc_high, pc_low);
+				result = ram->read(op_high, op_low);
+				if ((result & 0x80) > 0x00) {
+					flags.c_flag = 0b1;
+				}
+				else {
+					flags.c_flag = 0b0;
+				}
+
+				result = result << 1;
+
+				if (result == 0x00) {
+					flags.z_flag = 0b1;
+				}
+				if (result & 0x80 > 0) {
+					flags.n_flag = 0b1;
+				}
+
+				//finally, apply the operation to the RAM
+
+				ram->write(op_high, op_low, result);
+			}
 				break;
 			case ABSOLUTE_X:
+			{
+				unsigned char op_high;
+				unsigned char op_low;
+				increment_pc();
+				op_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				op_high = rom->read(pc_high, pc_low);
+
+				if (op_low + x_reg > 0xFF) {
+					if (op_high + 0x01 > 0xFF) {
+						op_high = 0x00;
+					}
+					else {
+						op_high += 0x01;
+					}
+					op_low == 0x00;
+					flags.c_flag = 0b1;
+				}
+				else {
+					flags.c_flag = 0b0;
+				}
+				op_low += x_reg;
+
+				unsigned char result = ram->read(op_high, op_low);
+				if ((result & 0x80) > 0) {
+					flags.c_flag = 0b1;
+				}
+				else {
+					flags.c_flag = 0b0;
+				}
+
+				result = result << 1;
+
+				if (result == 0x00) {
+					flags.z_flag = 0b1;
+				}
+				if (result & 0x80 > 0) {
+					flags.n_flag = 0b1;
+				}
+
+				ram->write(op_high, op_high, result);
+
+				increment_pc();
+			}
 				break;
-			case ABSOLUTE_Y:
+			case ZEROPAGE: {
+				increment_pc();
+				unsigned char operand = rom->read(pc_high, pc_low);
+				unsigned char result = ram->read(0x00, operand);
+				if ((result & 0x80) > 0) {
+					flags.c_flag = 0b1;
+				}
+				result = result << 1;
+				
+				if (result == 0x00) {
+					flags.z_flag = 0b1;
+				}
+				if (result & 0x80 > 0) {
+					flags.n_flag = 0b1;
+				}
+
+				ram->write(0x00, operand, result);
+
+				increment_pc();
+			}
 				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
+			case ZEROPAGE_X: {
+				increment_pc();
+				unsigned char operand = rom->read(pc_high, pc_low);
+				operand += x_reg;
+				unsigned char result = ram->read(0x00, operand);
+				if ((result & 0x80) > 0) {
+					flags.c_flag = 0b1;
+				}
+				result = result << 1;
+
+				if (result == 0x00) {
+					flags.z_flag = 0b1;
+				}
+				if ((result & 0x80) > 0) {
+					flags.n_flag = 0b1;
+				}
+
+				ram->write(0x00, operand, result);
+
+				increment_pc();
+			}
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
+			increment_pc(); //increment the PC
+		}
 			break;
 		case BCC:
 			break;
@@ -941,4 +1067,19 @@ void Processor::increment_pc() {
 	else {
 		pc_low += 0x01;
 	}
+}
+
+/// <summary>
+/// reset function, clears the memory and resets the processor to initial status
+/// </summary>
+void Processor::reset() {
+	ram->clearMemory();
+	rom->clearMemory();
+	flags.val = 0x00;
+	a_reg = 0x00;
+	x_reg = 0x00;
+	y_reg = 0x00;
+	sp_reg = 0x00;
+	pc_high = 0x00;
+	pc_low = 0x00;
 }
