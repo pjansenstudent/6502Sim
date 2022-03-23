@@ -21,6 +21,57 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ResetDialog(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    TestDialog(HWND, UINT, WPARAM, LPARAM);
+
+/*
+   Controls Declarations
+*/
+
+//One thing I cannot seem to find much information on is where to declare controls that I'll be using and updating throughout the application, so I'm going to declare my controls globally for now
+HWND a_reg_readout;
+HWND x_reg_readout;
+HWND y_reg_readout;
+HWND sp_reg_readout;
+HWND f_n_readout;
+HWND f_v_readout;
+HWND f_b_readout;
+HWND f_d_readout;
+HWND f_i_readout;
+HWND f_z_readout;
+HWND f_c_readout;
+HWND f_n_label;
+HWND f_v_label;
+HWND f_b_label;
+HWND f_d_label;
+HWND f_i_label;
+HWND f_z_label;
+HWND f_c_label;
+HWND output_readout;
+HWND pch_readout;
+HWND pcl_readout;
+
+
+//text boxes for viewing ram/rom, I think these will be textboxes of some sorts, with autoscroll or some other formatting done
+HWND ram_viewer;
+HWND rom_viewer;
+
+//the button control for 
+HWND step_button;
+
+//labels for everything
+HWND a_label;
+HWND x_label;
+HWND y_label;
+HWND pch_label;
+HWND pcl_label;
+HWND f_label;
+HWND output_label;
+HWND ram_label;
+HWND rom_label;
+HWND sp_label;
+/*
+   End controls Declaration
+*/
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -135,6 +186,45 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (message)
     {
+    case WM_CREATE: {
+        //Initialize my controls
+            
+            //setup register readouts
+            a_label = CreateWindow(L"Static", L"Accumulator:", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 20, 85, 20, hWnd, (HMENU)1, NULL, NULL);
+            a_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 20, 65, 20, hWnd, (HMENU) 1, NULL, NULL);
+            x_label = CreateWindow(L"Static", L"X Register: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 50, 85, 20, hWnd, (HMENU) 1, NULL, NULL);
+            x_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 50, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+            y_label = CreateWindow(L"Static", L"Y Register: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 80, 85, 20, hWnd, (HMENU)1, NULL, NULL);
+            y_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 80, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+            pch_label = CreateWindow(L"Static", L"PC High:", WS_CHILD | WS_VISIBLE | SS_LEFT, 200, 20, 85, 20, hWnd, (HMENU)1, NULL, NULL);
+            pch_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 20, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+            pcl_label = CreateWindow(L"Static", L"PC Low: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 200, 50, 85, 20, hWnd, (HMENU)1, NULL, NULL);
+            pcl_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 50, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+            sp_label = CreateWindow(L"Static", L"Stack Point: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 200, 80, 85, 20, hWnd, (HMENU)1, NULL, NULL);
+            sp_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 80, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_label = CreateWindow(L"Static", L"Flags", WS_CHILD | WS_VISIBLE | SS_CENTER, 160, 120, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+
+            //flags setup
+            f_n_label = CreateWindow(L"Static", L"N", WS_CHILD | WS_VISIBLE | SS_CENTER, 20 + 70, 150, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_v_label = CreateWindow(L"Static", L"V", WS_CHILD | WS_VISIBLE | SS_CENTER, 50 + 70, 150, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_b_label = CreateWindow(L"Static", L"B", WS_CHILD | WS_VISIBLE | SS_CENTER, 80 + 70, 150, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_d_label = CreateWindow(L"Static", L"D", WS_CHILD | WS_VISIBLE | SS_CENTER, 110 + 70, 150, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_i_label = CreateWindow(L"Static", L"I", WS_CHILD | WS_VISIBLE | SS_CENTER, 140 + 70, 150, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_z_label = CreateWindow(L"Static", L"Z", WS_CHILD | WS_VISIBLE | SS_CENTER, 170 + 70, 150, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_c_label = CreateWindow(L"Static", L"C", WS_CHILD | WS_VISIBLE | SS_CENTER, 200 + 70, 150, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_n_readout = CreateWindow(L"Static", L"0", WS_CHILD | WS_VISIBLE | SS_CENTER, 20 + 70, 180, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_v_readout = CreateWindow(L"Static", L"0", WS_CHILD | WS_VISIBLE | SS_CENTER, 50 + 70, 180, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_b_readout = CreateWindow(L"Static", L"0", WS_CHILD | WS_VISIBLE | SS_CENTER, 80 + 70, 180, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_d_readout = CreateWindow(L"Static", L"0", WS_CHILD | WS_VISIBLE | SS_CENTER, 110 + 70, 180, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_i_readout = CreateWindow(L"Static", L"0", WS_CHILD | WS_VISIBLE | SS_CENTER, 140 + 70, 180, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_z_readout = CreateWindow(L"Static", L"0", WS_CHILD | WS_VISIBLE | SS_CENTER, 170 + 70, 180, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+            f_c_readout = CreateWindow(L"Static", L"0", WS_CHILD | WS_VISIBLE | SS_CENTER, 200 + 70, 180, 20, 20, hWnd, (HMENU)1, NULL, NULL);
+
+            //step button setup
+
+            step_button = CreateWindow(L"BUTTON", L"STEP", WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 150, 210, 80, 40, hWnd, (HMENU)ID_STEPBUTTON, (HINSTANCE)GetWindowLongPtr(hWnd, GWLP_HINSTANCE), NULL); // not entirely sure what the longPtr does, but This should create a button that does things
+        } 
+        break;
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
@@ -151,6 +241,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 //bring up dialog box for resetting the processor
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_RESETDIALOG), hWnd, ResetDialog);
                 break;
+            case ID_STEPBUTTON:
+                //do button stuff here
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_TESTDIALOG), hWnd, TestDialog);
+                break;
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
@@ -161,8 +255,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: Add any drawing code that uses hdc here...
-
-            //this is where I think I'll be adding my elements to the window, such as text boxes and stuff
 
             EndPaint(hWnd, &ps);
         }
@@ -211,6 +303,23 @@ INT_PTR CALLBACK ResetDialog(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             return (INT_PTR)TRUE;
         }
         else if (LOWORD(wParam == IDCANCEL)) {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
+}
+
+INT_PTR CALLBACK TestDialog(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        return(INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK) {
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
         }

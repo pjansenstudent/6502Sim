@@ -373,8 +373,71 @@ void Processor::execute() {
 		}
 			break;
 		case BCC:
+			
+			increment_pc();
+
+			//branch on carry flag clear
+			if (flags.c_flag == 0b0){
+				unsigned char operand = rom->read(pc_high, pc_low);
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc();
+			}
 			break;
 		case BCS:
+			increment_pc();
+
+			//branch on carry flag clear
+			if (flags.c_flag == 0b1) {
+				unsigned char operand = rom->read(pc_high, pc_low);
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc();
+			}
 			break;
 		case BEQ:
 			break;
