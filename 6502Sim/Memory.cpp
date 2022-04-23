@@ -85,3 +85,7 @@ void Memory::write(unsigned char offsetHigh, unsigned char offsetLow, unsigned c
 
 	_memblock[addr] = value; //write the value to the address
 }
+
+unsigned int Memory::get_size() {
+	return _memsize;
+}

@@ -20,4 +20,5 @@ public:
 	void clearMemory(); // a function for clearing the memory (aka: setting everything to 0x00) 
 	unsigned char read(unsigned char offsetHigh, unsigned char offsetLow);
 	void write(unsigned char offsetHigh, unsigned char offsetLow, unsigned char value);
+	unsigned int get_size();
 };

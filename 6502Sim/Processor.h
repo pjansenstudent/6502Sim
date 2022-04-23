@@ -1,5 +1,6 @@
 #pragma once
 #include "Memory.h"
+#include <fstream> //file input/output for c++, I'm going to use this for 
 
 
 /// <summary>
@@ -163,6 +164,7 @@ private:
 	void decode();
 	void execute();
 	void increment_pc();
+	unsigned char little_to_big_endian(unsigned char input);
 
 public:
 	Processor(); //default constructor, defaults to 2KB RAM/ROM
@@ -171,20 +173,24 @@ public:
 	//finally, the functions that I'll be able to use from outside the class itself, that the interface and controlling apparatus will use
 	void step(); // this function will be used to initiate the fetch-decode-execute cycle by the processor
 	unsigned char get_output(); //this function will be used to get the resulting output from processor (aka, what would be on the data pins)
-	unsigned char get_address_high(); //this function will be used to get the address pins (high bits)
-	unsigned char get_address_low(); // same for low bits
+	unsigned char get_pc_high(); //this function will be used to get the address pins (high bits)
+	unsigned char get_pc_low(); // same for low bits
 	unsigned char get_sflags(); //for getting register status, I can use the unsigned char for this
 	unsigned char get_accumulator(); //get accumulator contents
 	unsigned char get_x(); //for getting x register contents
 	unsigned char get_y(); //same for y
+	unsigned char get_sp(); //get stack pointer register
 	bool get_readwrite(); //currently unused, but will be used to get the status of reading/writing pin, can be used if design is changed to implement timing and simulate actual processor hardware function
 	void reset(); //for resetting the CPU to initial status (should be pretty straightforward)
 	const char* get_state(); //will convert the processor state to a string (of some sort, c-style for now, likely will be changed to some Win32 string or something), and return it for the interface
+	void load_program(const char* filepath);
+	unsigned char get_rom_value(unsigned char address_high, unsigned char address_low);
+	unsigned char get_ram_value(unsigned char address_high, unsigned char address_low);
+	unsigned int get_rom_size();
+	unsigned int get_ram_size();
 
 	//functions I'm not sure how to implement yet, but will need
 	//void load_rom(//some sort of file input or something); //I will definitely need some sort of function for loading instructions into the ROM
-	//void get_rom(); //for getting rom values from CPU, unsure of how I'm going to do this right now, but I'll need some sort of function for getting the ROM contents
-	//void get_ram(); //for getting ram values from CPU, unsure of how I'm going to do this right now, but I'll need some sort of function for getting the RAM contents
 	
 };
 

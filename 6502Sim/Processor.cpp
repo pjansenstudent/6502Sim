@@ -70,6 +70,48 @@ Processor::~Processor() {
 }
 
 /// <summary>
+/// Standard Get Function for Accumulator
+/// </summary>
+/// <returns></returns>
+unsigned char Processor::get_accumulator() {
+	return a_reg;
+}
+
+
+unsigned char Processor::get_x() {
+	return x_reg;
+}
+
+
+unsigned char Processor::get_y() {
+	return y_reg;
+}
+
+
+unsigned char Processor::get_pc_high() {
+	return pc_high;
+}
+
+
+unsigned char Processor::get_pc_low() {
+	return pc_low;
+}
+
+
+unsigned char Processor::get_output() {
+	return output;
+}
+
+
+unsigned char Processor::get_sflags() {
+	return flags.val;
+}
+
+unsigned char Processor::get_sp() {
+	return sp_reg;
+}
+
+/// <summary>
 /// Internal Fetch command, a bit crude for now as there is no try-catch for failure of address resolution, however that can be resolved fairly easily once this is operational
 /// </summary>
 void Processor::fetch() {
@@ -440,60 +482,271 @@ void Processor::execute() {
 			}
 			break;
 		case BEQ:
+		{
+			increment_pc();
+			unsigned char operand = rom->read(pc_high, pc_low);
+
+			if (flags.z_flag == 0b1) {
+				//branch on flag being set, do a relative address mode 
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc(); //no need to branch, it just needs to continue on
+			}
+		}
 			break;
 		case BIT:
-			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
-			case ERR:
-				state = JAMMED; //jam the processor
-				break;
-			}
+		{
+			increment_pc();
+			unsigned char operand;
+				switch (addr_mode) {
+				case ABSOLUT:
+				{
+					unsigned char offset_l = rom->read(pc_high, pc_low);
+					increment_pc();
+					unsigned char offset_h = rom->read(pc_high, pc_low);
+					operand = rom->read(offset_h, offset_l);
+				}
+					break;
+				case ZEROPAGE:
+					operand = rom->read(0x00, rom->read(pc_high, pc_low));
+					break;
+				case ERR:
+					state = JAMMED; //jam the processor
+					break;
+				}
+
+				//regardless of addressing mode, do the operation
+				if (operand & 0x80 > 0) {
+					flags.n_flag = 0b1;
+				}
+				else {
+					flags.n_flag = 0b0;
+				}
+				if (operand & 0x40 > 0) {
+					flags.o_flag = 0b1;
+				}
+				else {
+					flags.o_flag = 0b0;
+				}
+				if (a_reg & operand > 0) {
+					flags.z_flag = 0b1;
+				}
+				else {
+
+				}
+				increment_pc(); //increment the pc
+		}
 			break;
 		case BMI:
-
+		{
+			increment_pc();
+			unsigned char operand = rom->read(pc_high, pc_low);
+			if (flags.n_flag == 0b1){
+				//branch on flag being set, do a relative address mode 
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+						operand += 1; //do the two's coplement conversion
+						if ((pc_low - operand) < 0x00) {
+							pc_high -= 0x01;
+								pc_low -= operand;
+						}
+						else {
+							pc_low -= operand;
+						}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc();
+			}
+		}
 			break;
 		case BNE:
+		{
+			increment_pc();
+			unsigned char operand = rom->read(pc_high, pc_low);
+
+			if (flags.z_flag == 0b0) {
+				//branch on flag being set, do a relative address mode 
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc(); //no need to branch, it just needs to continue on
+			}
+		}
 			break;
 		case BPL:
+		{
+			increment_pc();
+			unsigned char operand = rom->read(pc_high, pc_low);
+			if (flags.n_flag == 0b0){
+				//branch on flag being set, do a relative address mode 
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+						operand += 1; //do the two's coplement conversion
+						if ((pc_low - operand) < 0x00) {
+							pc_high -= 0x01;
+								pc_low -= operand;
+						}
+						else {
+							pc_low -= operand;
+						}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc();
+			}
+		}
 			break;
 		case BRK:
 			break;
 		case BVC:
+		{
+			increment_pc();
+			unsigned char operand = rom->read(pc_high, pc_low);
+			if (flags.o_flag == 0b0) {
+				//branch on flag being set, do a relative address mode 
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc();
+			}
+		}
 			break;
 		case BVS:
+		{
+			increment_pc();
+			unsigned char operand = rom->read(pc_high, pc_low);
+			if (flags.o_flag == 0b1) {
+				//branch on flag being set, do a relative address mode 
+				if ((operand & 0x80) > 0) {
+					//subtraction case, I'll need to convert from signed negative to something I can subtract with
+					operand = ~operand; //flip all of the bits in operand
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
+				}
+				else {
+					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
+					if ((pc_low + operand) > 0xFF) {
+						pc_high += 0x01;
+						pc_low += operand;
+					}
+					else {
+						pc_low += operand;
+					}
+				}
+			}
+			else {
+				increment_pc();
+			}
+		}
 			break;
 		case CLC:
+			flags.c_flag = 0b0;
+			increment_pc();
 			break;
 		case CLD:
+			increment_pc();
+			flags.d_flag == 0b0;
 			break;
 		case CLI:
+			increment_pc();
+			flags.id_flag == 0b0;
 			break;
 		case CLV:
+			increment_pc();
+			flags.o_flag == 0b0;
 			break;
 		case CMP:
 			switch (addr_mode) {
@@ -706,16 +959,29 @@ void Processor::execute() {
 		case JSR:
 			break;
 		case LDA:
+		{
+			increment_pc();
+			unsigned char operand;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
 			case ABSOLUT:
+			{
+				unsigned char mem_l = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char mem_h = rom->read(pc_high, pc_low);
+				operand = rom->read(mem_h, mem_l);
+			}
 				break;
 			case ABSOLUTE_X:
 				break;
 			case ABSOLUTE_Y:
 				break;
 			case IMMEDIATE:
+			{
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
+			}
 				break;
 			case IMPLIED:
 				break;
@@ -737,6 +1003,10 @@ void Processor::execute() {
 				state = JAMMED; //jam the processor
 				break;
 			}
+
+			a_reg = operand; //load the accumulator with the value
+			increment_pc();
+		}
 			break;
 		case LDX:
 			switch (addr_mode) {
@@ -1107,7 +1377,7 @@ void Processor::execute() {
 		if (state != JAMMED) {
 			state = FETCH;
 		}
-		increment_pc(); //increase the pc for the next instruction
+		//increment_pc(); //increase the pc for the next instruction //not sure if needed at the moment, as I'm currently accounting for this manually in instructions, it's inefficient, but it allows me to avoid decrementing pc on jumps and branches
 	} else {
 		//state error correcting here, 
 	}
@@ -1145,4 +1415,100 @@ void Processor::reset() {
 	sp_reg = 0x00;
 	pc_high = 0x00;
 	pc_low = 0x00;
+}
+
+/// <summary>
+/// The load_progam function loads a program into the rom, it is a critical part of the entire application, as this is the part where 
+/// </summary>
+/// <param name="filepath"></param>
+void Processor::load_program(const char* filepath) {
+	union rom_iterator {
+		struct {
+			unsigned char high : 8;
+			unsigned char low : 8;
+		};
+		unsigned short full;
+	};
+
+	rom_iterator itr;
+	itr.full = 0x0000;
+
+	//initialize an input stream
+	unsigned char byte_read = 0x00;
+	std::ifstream input_file_stream;
+	input_file_stream.open(filepath); //open the file from the resulting filepalth, I'll likely put this in a try-catch block at some point
+
+	//read each byte and input it into 
+	while (!input_file_stream.eof()) {
+		byte_read = input_file_stream.get();
+		rom->write(itr.high, itr.low, byte_read);
+		itr.full++;
+	}
+}
+
+/// <summary>
+/// This function is necessary since binary files for the 6502 are in little endian format
+/// this function is probaby very inefficient, but it's a quick and dirty fix that will work, I can always replace this algorithm with a more efficient one later
+/// </summary>
+/// <param name="input"></param>
+/// <returns></returns>
+unsigned char Processor::little_to_big_endian(unsigned char input) {
+	union byte {
+		struct {
+			unsigned char b7 : 1;
+			unsigned char b6 : 1;
+			unsigned char b5 : 1;
+			unsigned char b4 : 1;
+			unsigned char b3 : 1;
+			unsigned char b2 : 1;
+			unsigned char b1 : 1;
+			unsigned char b0 : 1;
+		};
+		unsigned char val;
+	};
+
+	byte inputbyte;
+	inputbyte.val = input;
+	byte outputbyte;
+
+	//flip the bytes
+	outputbyte.b0 = inputbyte.b7;
+	outputbyte.b1 = inputbyte.b6;
+	outputbyte.b2 = inputbyte.b5;
+	outputbyte.b3 = inputbyte.b4;
+	outputbyte.b4 = inputbyte.b3;
+	outputbyte.b5 = inputbyte.b2;
+	outputbyte.b6 = inputbyte.b1;
+	outputbyte.b7 = inputbyte.b0;
+	return outputbyte.val; //returns the now flipped byte
+}
+
+void Processor::step() {
+	if (state == FETCH) {
+		fetch();
+		decode();
+		execute();
+	}
+	else {
+		state = JAMMED;
+	}
+}
+
+
+unsigned int Processor::get_rom_size() {
+	return rom->get_size();
+}
+
+
+unsigned int Processor::get_ram_size() {
+	return ram->get_size();
+}
+
+unsigned char Processor::get_rom_value(unsigned char offsetHigh, unsigned char offsetLow) {
+	return rom->read(offsetHigh, offsetLow);
+}
+
+
+unsigned char Processor::get_ram_value(unsigned char offsetHigh, unsigned char offsetLow) {
+	return rom->read(offsetHigh, offsetLow);
 }
