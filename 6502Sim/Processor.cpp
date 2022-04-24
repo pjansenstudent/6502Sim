@@ -15,7 +15,7 @@ Processor::Processor() {
 	a_reg = 0x00;
 	x_reg = 0x00;
 	y_reg = 0x00;
-	sp_reg = 0x00;
+	sp_reg = 0xFF; //set to FF as per Stack Pointer operation (page 2 FF to 00) https://www.cs.jhu.edu/~phi/csf/slides/lecture-6502-stack.pdf
 
 	flags.val = 0x00; //set our flag register to all zeroes
 
@@ -47,7 +47,7 @@ Processor::Processor(unsigned int ram_size, unsigned int rom_size) {
 	a_reg = 0x00;
 	x_reg = 0x00;
 	y_reg = 0x00;
-	sp_reg = 0x00;
+	sp_reg = 0xFF; //set to FF as per Stack Pointer operation (page 2 FF to 00) https://www.cs.jhu.edu/~phi/csf/slides/lecture-6502-stack.pdf
 
 	flags.val = 0x00; //set our flag register to all zeroes
 
@@ -160,28 +160,107 @@ void Processor::execute() {
 
 			switch (addr_mode) {
 			case ABSOLUT:
+			{
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
 				break;
-			case ABSOLUTE_X:
+			case ABSOLUTE_X: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
 				break;
-			case ABSOLUTE_Y:
+			case ABSOLUTE_Y: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
 				break;
 			case IMMEDIATE:
 				increment_pc();
 				operand = rom->read(pc_high, pc_low);
 				break;
-			case IMPLIED:
+			case INDIRECT_X: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr += x_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
 				break;
-			case INDIRECT:
+			case INDIRECT_Y: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr += y_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
 				break;
-			case INDIRECT_X:
+			case ZEROPAGE: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low));
+			}
 				break;
-			case INDIRECT_Y:
+			case ZEROPAGE_X: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
+			}
 				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
+			case ZEROPAGE_Y: {
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + y_reg);
+			}
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
@@ -191,15 +270,41 @@ void Processor::execute() {
 			if (flags.d_flag == 0) {
 				//the 6502 has an interesting overflow flag, and it's relationship with the other flags. Basically, it checks to see if overflow occurs on SIGNED math, rather than unsigned, meaning I can't just check for a normal overflow for 
 				//using the formula from http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html, we can implement it in C++ rather easily, this should allow the addition to take place
-				if (!(a_reg ^ operand) && (a_reg ^ (a_reg + operand))) {
-
+				/*if (!(a_reg ^ operand) && (a_reg ^ (a_reg + operand))) {
+					
 				}
 				//As far as I'm aware, the carry bit should be pretty simple, we just need to factor in the current carry bit, and determine whether we got a carry bit, did it in ternary because it's nice and clean
-				if (a_reg + operand + ((flags.c_flag == 0b1) ? 0x01 : 0x00) > 0xFF) {
+				if ((int)(a_reg + operand + ((flags.c_flag == 0b1) ? 0x01 : 0x00) > 0xFF)) {
 					flags.c_flag = 0b1; //set carry
 				}
 				else {
 					flags.c_flag = 0b0; //clear carry, I think this makes sense, as carry should always be the carry bit
+				}*/
+
+				//doing a simpler version of it for now
+				if ((operand & 0x80) > 0) {
+					if ((a_reg & 0x80) > 0) {
+						//both negative
+						if (((a_reg - operand) & 0x80) > 0) {
+							flags.o_flag = 0b1;
+						}
+						else {
+							flags.o_flag = 0b0;
+						}
+					}
+				}
+				else {
+					if (a_reg < 0x80) { //accomplishes the same thing as & 0x80 > 0, but 
+						if (((int)a_reg + operand) > 0xFF) {
+							flags.c_flag = 0b1;
+							flags.o_flag = 0b1;
+
+						}
+						else {
+							flags.c_flag = 0b0;
+							flags.o_flag = 0b0;
+						}
+					}
 				}
 				a_reg += operand; //do the addition for the actual value in the accumulator
 
@@ -219,39 +324,114 @@ void Processor::execute() {
 			}
 
 		}
-			break;
+				break;
 		case AND:
 		{
 			unsigned char operand = 0x00;
 			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
 			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
+			{
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
+			break;
+			case ABSOLUTE_X: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
+			case ABSOLUTE_Y: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
 			case IMMEDIATE:
 				increment_pc();
 				operand = rom->read(pc_high, pc_low);
 				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
+			case INDIRECT_X: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr += x_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+						   break;
+			case INDIRECT_Y: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr += y_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+						   break;
+			case ZEROPAGE: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low));
+			}
+						 break;
+			case ZEROPAGE_X: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
+			}
+						   break;
+			case ZEROPAGE_Y: {
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + y_reg);
+			}
+						   break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
@@ -268,16 +448,16 @@ void Processor::execute() {
 			increment_pc(); //finally, increment program counter for next instruction
 
 		}
-			break;
+		break;
 		case ASL: {
 			switch (addr_mode) {
 			case ACCUMULATOR:
 			{
-				
-				
+
+
 				//perform bit-shift
 				a_reg = a_reg << 1;
-				
+
 				//check result for zero and negative results
 				if (a_reg == 0x00) {
 					flags.z_flag = 0b1;
@@ -286,7 +466,7 @@ void Processor::execute() {
 					flags.n_flag = 0b1;
 				}
 			}
-				break;
+			break;
 			case ABSOLUT:
 			{
 				unsigned char op_high = 0x00;
@@ -317,7 +497,7 @@ void Processor::execute() {
 
 				ram->write(op_high, op_low, result);
 			}
-				break;
+			break;
 			case ABSOLUTE_X:
 			{
 				unsigned char op_high;
@@ -363,7 +543,7 @@ void Processor::execute() {
 
 				increment_pc();
 			}
-				break;
+			break;
 			case ZEROPAGE: {
 				increment_pc();
 				unsigned char operand = rom->read(pc_high, pc_low);
@@ -372,7 +552,7 @@ void Processor::execute() {
 					flags.c_flag = 0b1;
 				}
 				result = result << 1;
-				
+
 				if (result == 0x00) {
 					flags.z_flag = 0b1;
 				}
@@ -384,7 +564,7 @@ void Processor::execute() {
 
 				increment_pc();
 			}
-				break;
+						 break;
 			case ZEROPAGE_X: {
 				increment_pc();
 				unsigned char operand = rom->read(pc_high, pc_low);
@@ -406,20 +586,20 @@ void Processor::execute() {
 
 				increment_pc();
 			}
-				break;
+						   break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
 			increment_pc(); //increment the PC
 		}
-			break;
+				break;
 		case BCC:
-			
+
 			increment_pc();
 
 			//branch on carry flag clear
-			if (flags.c_flag == 0b0){
+			if (flags.c_flag == 0b0) {
 				unsigned char operand = rom->read(pc_high, pc_low);
 				if ((operand & 0x80) > 0) {
 					//subtraction case, I'll need to convert from signed negative to something I can subtract with
@@ -515,67 +695,67 @@ void Processor::execute() {
 				increment_pc(); //no need to branch, it just needs to continue on
 			}
 		}
-			break;
+		break;
 		case BIT:
 		{
 			increment_pc();
 			unsigned char operand;
-				switch (addr_mode) {
-				case ABSOLUT:
-				{
-					unsigned char offset_l = rom->read(pc_high, pc_low);
-					increment_pc();
-					unsigned char offset_h = rom->read(pc_high, pc_low);
-					operand = rom->read(offset_h, offset_l);
-				}
-					break;
-				case ZEROPAGE:
-					operand = rom->read(0x00, rom->read(pc_high, pc_low));
-					break;
-				case ERR:
-					state = JAMMED; //jam the processor
-					break;
-				}
-
-				//regardless of addressing mode, do the operation
-				if (operand & 0x80 > 0) {
-					flags.n_flag = 0b1;
-				}
-				else {
-					flags.n_flag = 0b0;
-				}
-				if (operand & 0x40 > 0) {
-					flags.o_flag = 0b1;
-				}
-				else {
-					flags.o_flag = 0b0;
-				}
-				if (a_reg & operand > 0) {
-					flags.z_flag = 0b1;
-				}
-				else {
-
-				}
-				increment_pc(); //increment the pc
-		}
+			switch (addr_mode) {
+			case ABSOLUT:
+			{
+				unsigned char offset_l = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char offset_h = rom->read(pc_high, pc_low);
+				operand = rom->read(offset_h, offset_l);
+			}
 			break;
+			case ZEROPAGE:
+				operand = rom->read(0x00, rom->read(pc_high, pc_low));
+				break;
+			case ERR:
+				state = JAMMED; //jam the processor
+				break;
+			}
+
+			//regardless of addressing mode, do the operation
+			if (operand & 0x80 > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag = 0b0;
+			}
+			if (operand & 0x40 > 0) {
+				flags.o_flag = 0b1;
+			}
+			else {
+				flags.o_flag = 0b0;
+			}
+			if (a_reg & operand > 0) {
+				flags.z_flag = 0b1;
+			}
+			else {
+
+			}
+			increment_pc(); //increment the pc
+		}
+		break;
 		case BMI:
 		{
 			increment_pc();
 			unsigned char operand = rom->read(pc_high, pc_low);
-			if (flags.n_flag == 0b1){
+			if (flags.n_flag == 0b1) {
 				//branch on flag being set, do a relative address mode 
 				if ((operand & 0x80) > 0) {
 					//subtraction case, I'll need to convert from signed negative to something I can subtract with
 					operand = ~operand; //flip all of the bits in operand
-						operand += 1; //do the two's coplement conversion
-						if ((pc_low - operand) < 0x00) {
-							pc_high -= 0x01;
-								pc_low -= operand;
-						}
-						else {
-							pc_low -= operand;
-						}
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
 				}
 				else {
 					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
@@ -592,7 +772,7 @@ void Processor::execute() {
 				increment_pc();
 			}
 		}
-			break;
+		break;
 		case BNE:
 		{
 			increment_pc();
@@ -627,24 +807,24 @@ void Processor::execute() {
 				increment_pc(); //no need to branch, it just needs to continue on
 			}
 		}
-			break;
+		break;
 		case BPL:
 		{
 			increment_pc();
 			unsigned char operand = rom->read(pc_high, pc_low);
-			if (flags.n_flag == 0b0){
+			if (flags.n_flag == 0b0) {
 				//branch on flag being set, do a relative address mode 
 				if ((operand & 0x80) > 0) {
 					//subtraction case, I'll need to convert from signed negative to something I can subtract with
 					operand = ~operand; //flip all of the bits in operand
-						operand += 1; //do the two's coplement conversion
-						if ((pc_low - operand) < 0x00) {
-							pc_high -= 0x01;
-								pc_low -= operand;
-						}
-						else {
-							pc_low -= operand;
-						}
+					operand += 1; //do the two's coplement conversion
+					if ((pc_low - operand) < 0x00) {
+						pc_high -= 0x01;
+						pc_low -= operand;
+					}
+					else {
+						pc_low -= operand;
+					}
 				}
 				else {
 					//I'm not sure how the signed bit operation works with the program counter, and if carrying occurs, but for now I'll assume it does
@@ -661,7 +841,7 @@ void Processor::execute() {
 				increment_pc();
 			}
 		}
-			break;
+		break;
 		case BRK:
 			break;
 		case BVC:
@@ -697,7 +877,7 @@ void Processor::execute() {
 				increment_pc();
 			}
 		}
-			break;
+		break;
 		case BVS:
 		{
 			increment_pc();
@@ -731,7 +911,7 @@ void Processor::execute() {
 				increment_pc();
 			}
 		}
-			break;
+		break;
 		case CLC:
 			flags.c_flag = 0b0;
 			increment_pc();
@@ -748,143 +928,287 @@ void Processor::execute() {
 			increment_pc();
 			flags.o_flag == 0b0;
 			break;
-		case CMP:
+		case CMP: {
+			increment_pc();
+			unsigned char operand;
 			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
 			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
-			case ERR:
-				state = JAMMED; //jam the processor
-				break;
+			{
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
 			}
 			break;
-		case CPX:
-			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
+			case ABSOLUTE_X: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
+			case ABSOLUTE_Y: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
 			case IMMEDIATE:
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
 				break;
-			case IMPLIED:
+			case INDIRECT_X: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr += x_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+						   break;
+			case INDIRECT_Y: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr += y_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+						   break;
+			case ZEROPAGE: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low));
+			}
+						 break;
+			case ZEROPAGE_X: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
+			}
+						   break;
+			case ZEROPAGE_Y: {
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + y_reg);
+			}
+						   break;
+			case ERR:
+				state = JAMMED; //jam the processor
 				break;
-			case INDIRECT:
+			}
+			unsigned char result = a_reg - operand;
+			if ((result & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag = 0b0;
+			}
+			if (result == 0) {
+				flags.z_flag = 0b1;
+				flags.c_flag = 0b1;
+			}
+			if (operand > a_reg) {
+				flags.z_flag = 0b0;
+				flags.c_flag = 0b0;
+			}
+			if (a_reg > operand) {
+				flags.z_flag = 0b0;
+				flags.c_flag = 0b1;
+			}
+		}
+				increment_pc();
 				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
+		case CPX: {
+			increment_pc();
+			unsigned char operand;
+			switch (addr_mode) {
+			case ABSOLUT: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
+						break;
+			case IMMEDIATE:
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
+			unsigned char result = x_reg - operand;
+			if ((result & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag = 0b0;
+			}
+			if (result == 0) {
+				flags.z_flag = 0b1;
+				flags.c_flag = 0b1;
+			}
+			if (operand > x_reg) {
+				flags.z_flag = 0b0;
+				flags.c_flag = 0b0;
+			}
+			if (x_reg > operand) {
+				flags.z_flag = 0b0;
+				flags.c_flag = 0b1;
+			}
+		}
+				increment_pc();
+				break;
+		case CPY:{
+			increment_pc();
+			unsigned char operand;
+			switch (addr_mode) {
+			case ABSOLUT: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
+						break;
+			case IMMEDIATE:
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
+				break;
+			case ERR:
+				state = JAMMED; //jam the processor
+				break;
+			}
+			unsigned char result = y_reg - operand;
+			if ((result & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag = 0b0;
+			}
+			if (result == 0) {
+				flags.z_flag = 0b1;
+				flags.c_flag = 0b1;
+			}
+			if (operand > y_reg) {
+				flags.z_flag = 0b0;
+				flags.c_flag = 0b0;
+			}
+			if (y_reg > operand) {
+				flags.z_flag = 0b0;
+				flags.c_flag = 0b1;
+			}
+			increment_pc();
+		}
 			break;
-		case CPY:
+		case DEC: {
+			unsigned char addr_high = 0x00;
+			unsigned char addr_low = 0x00;
 			switch (addr_mode) {
-			case ACCUMULATOR:
+			case ABSOLUT: {
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+			}
 				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
+			case ABSOLUTE_X: {
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+			}
 				break;
 			case ZEROPAGE:
+				increment_pc();
+				addr_low = ram->read(0x00, rom->read(pc_high, pc_low));
 				break;
 			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
+				increment_pc();
+				addr_low = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
-			break;
-		case DEC:
-			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
-			case ERR:
-				state = JAMMED; //jam the processor
-				break;
-			}
+			ram->write(addr_high, addr_low, ram->read(addr_high, addr_low) - 1);
+
+			increment_pc();
+		}
 			break;
 		case DEX:
+			x_reg--;
+			increment_pc();
 			break;
 		case DEY:
+			y_reg--;
+			increment_pc();
 			break;
-		case EOR:
+		case EOR: {
+			increment_pc();
+			unsigned char operand();
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
@@ -916,89 +1240,252 @@ void Processor::execute() {
 				state = JAMMED; //jam the processor
 				break;
 			}
+			//code goes here
+		}
+			increment_pc();
 			break;
-		case INC:
+		case INC: {
+			unsigned char operand = 0x00;
+			unsigned char addr_high = 0x00;
+			unsigned char addr_low = 0x00;
 			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
+			case ABSOLUT: {
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+			}
+						break;
+			case ABSOLUTE_X: {
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+			}
+						   break;
 			case ZEROPAGE:
+				increment_pc();
+				addr_low = ram->read(0x00, rom->read(pc_high, pc_low));
 				break;
 			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
+				increment_pc();
+				addr_low = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
+			operand--;
+			ram->write(addr_high, addr_low, operand);
+			if (operand == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			if ((operand & 0x80) > 1) {
+				flags.n_flag = 0b1;
+			}
+		}
+			increment_pc();
 			break;
 		case INX:
+			x_reg++;
+			if (x_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			if ((x_reg & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			increment_pc();
 			break;
 		case INY:
+			y_reg++;
+			if (y_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			if ((y_reg & 0x80) > 0) {
+
+			}
 			break;
-		case JMP:
-			break;
-		case JSR:
-			break;
+		case JMP: {
+			increment_pc();
+			unsigned char tmpAdd = rom->read(pc_high, pc_low);
+			increment_pc();
+			pc_high = rom->read(pc_high, pc_low);
+			pc_low = tmpAdd;
+			//no increment needed here, because it's manually setting the address
+		}
+				break;
+		case JSR: {
+			increment_pc();
+			ram->write(0x01, sp_reg, pc_high);
+			sp_reg--;
+			ram->write(0x01, sp_reg, pc_low);
+			sp_reg--;
+		}
+				break;
 		case LDA:
 		{
 			increment_pc();
 			unsigned char operand;
 			switch (addr_mode) {
 			case ACCUMULATOR:
+				operand = a_reg;
 				break;
-			case ABSOLUT:
-			{
-				unsigned char mem_l = rom->read(pc_high, pc_low);
+			case ABSOLUT: {
 				increment_pc();
-				unsigned char mem_h = rom->read(pc_high, pc_low);
-				operand = rom->read(mem_h, mem_l);
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
 			}
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
+						break;
+			case ABSOLUTE_X: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
+			case ABSOLUTE_Y: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
 			case IMMEDIATE:
-			{
 				increment_pc();
 				operand = rom->read(pc_high, pc_low);
+				break;
+			case INDIRECT: {
+				//basically the same as absolute
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
 			}
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
+						 break;
+			case INDIRECT_X: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr += x_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+						   break;
 			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
+			{
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr += y_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+			break;
+			case RELATIV: {
+				unsigned char addr_high = pc_high;
+				unsigned char addr_low = pc_low;
+				increment_pc();
+				unsigned char addr_mod = rom->read(pc_high, pc_low);
+				if (addr_mod >= 0x80) {
+					if (((int)addr_low - ((addr_mod & 0x7F) + 1)) < 0) {
+						addr_low = addr_low - ((addr_mod & 0x7F) + 1);
+						addr_high--;
+					}
+					else {
+						addr_low = addr_low - ((addr_mod & 0x7F) + 1);
+					}
+				}
+				else {
+					if (((int)addr_low + addr_mod) > 0xFF) {
+						addr_low += addr_mod;
+						addr_high++;
+					}
+					else {
+						addr_low += addr_mod;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						break;
+			case ZEROPAGE: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low));
+			}
+						 break;
+			case ZEROPAGE_X: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
+			}
+						   break;
+			case ZEROPAGE_Y: {
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + y_reg);
+			}
+						   break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
@@ -1007,8 +1494,315 @@ void Processor::execute() {
 			a_reg = operand; //load the accumulator with the value
 			increment_pc();
 		}
+		break;
+		case LDX: {
+			unsigned char operand;
+			switch (addr_mode) {
+			case ACCUMULATOR:
+				operand = a_reg;
+				break;
+			case ABSOLUT: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
+						break;
+			case ABSOLUTE_X: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
+			case ABSOLUTE_Y: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
+			case IMMEDIATE:
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
+				break;
+			case INDIRECT: {
+				//basically the same as absolute
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
+						 break;
+			case INDIRECT_X: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr += x_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+						   break;
+			case INDIRECT_Y:
+			{
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr += y_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
 			break;
-		case LDX:
+			case RELATIV: {
+				unsigned char addr_high = pc_high;
+				unsigned char addr_low = pc_low;
+				increment_pc();
+				unsigned char addr_mod = rom->read(pc_high, pc_low);
+				if (addr_mod >= 0x80) {
+					if (((int)addr_low - ((addr_mod & 0x7F) + 1)) < 0) {
+						addr_low = addr_low - ((addr_mod & 0x7F) + 1);
+						addr_high--;
+					}
+					else {
+						addr_low = addr_low - ((addr_mod & 0x7F) + 1);
+					}
+				}
+				else {
+					if (((int)addr_low + addr_mod) > 0xFF) {
+						addr_low += addr_mod;
+						addr_high++;
+					}
+					else {
+						addr_low += addr_mod;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						break;
+			case ZEROPAGE: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low));
+			}
+						 break;
+			case ZEROPAGE_X: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
+			}
+						   break;
+			case ZEROPAGE_Y: {
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + y_reg);
+			}
+						   break;
+			case ERR:
+				state = JAMMED; //jam the processor
+				break;
+			}
+			x_reg = operand;
+		}
+			increment_pc();
+			break;
+		case LDY: {
+			unsigned char operand;
+			switch (addr_mode) {
+			case ACCUMULATOR:
+				operand = a_reg;
+				break;
+			case ABSOLUT: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
+						break;
+			case ABSOLUTE_X: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
+			case ABSOLUTE_Y: {
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						   break;
+			case IMMEDIATE:
+				increment_pc();
+				operand = rom->read(pc_high, pc_low);
+				break;
+			case INDIRECT: {
+				//basically the same as absolute
+				increment_pc();
+				unsigned char addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				unsigned char addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+			}
+						 break;
+			case INDIRECT_X: {
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr += x_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+						   break;
+			case INDIRECT_Y:
+			{
+				increment_pc();
+				unsigned char addr = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr += y_reg;
+				}
+				operand = ram->read(0x00, addr); //this could be wrong, according to source ,but the source is a bit confusing, I'll leave it as this for now, as it's 
+			}
+			break;
+			case RELATIV: {
+				unsigned char addr_high = pc_high;
+				unsigned char addr_low = pc_low;
+				increment_pc();
+				unsigned char addr_mod = rom->read(pc_high, pc_low);
+				if (addr_mod >= 0x80) {
+					if (((int)addr_low - ((addr_mod & 0x7F) + 1)) < 0) {
+						addr_low = addr_low - ((addr_mod & 0x7F) + 1);
+						addr_high--;
+					}
+					else {
+						addr_low = addr_low - ((addr_mod & 0x7F) + 1);
+					}
+				}
+				else {
+					if (((int)addr_low + addr_mod) > 0xFF) {
+						addr_low += addr_mod;
+						addr_high++;
+					}
+					else {
+						addr_low += addr_mod;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
+			}
+						break;
+			case ZEROPAGE: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low));
+			}
+						 break;
+			case ZEROPAGE_X: {
+				increment_pc();
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + x_reg);
+			}
+						   break;
+			case ZEROPAGE_Y: {
+				operand = ram->read(0x00, rom->read(pc_high, pc_low) + y_reg);
+			}
+						   break;
+			case ERR:
+				state = JAMMED; //jam the processor
+				break;
+			}
+			y_reg = operand;
+		}
+			increment_pc();
+			break;
+		case LSR: {
+			unsigned char operand = 0x00;
+			unsigned char addr_low = 0x00;
+			unsigned char addr_high = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
@@ -1040,187 +1834,393 @@ void Processor::execute() {
 				state = JAMMED; //jam the processor
 				break;
 			}
-			break;
-		case LDY:
-			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
-			case ERR:
-				state = JAMMED; //jam the processor
-				break;
-			}
-			break;
-		case LSR:
-			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
-			case ERR:
-				state = JAMMED; //jam the processor
-				break;
-			}
+			increment_pc();
+		}
 			break;
 		case NOP:
+			increment_pc();
 			break;
-		case ORA:
+		case ORA: {
+			unsigned char operand = 0x00;
+			unsigned char addr_low = 0x00;
+			unsigned char addr_high = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
 			case ABSOLUT:
-				break;
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
+					break;
 			case ABSOLUTE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(pc_high, pc_low);
 				break;
 			case INDIRECT_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr_low -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += x_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case INDIRECT_Y:
-				break;
-			case RELATIV:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr_low -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += y_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low + x_reg);
 				break;
 			case ZEROPAGE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low + y_reg);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
+
+		}
 			break;
 		case PHA:
+			ram->write(0x01, sp_reg, a_reg);
+			sp_reg--;
 			break;
 		case PHP:
+			flags.b_flag = 0b1;
+			flags.rsvd = 0b1;
+			ram->write(0x01, sp_reg, flags.val);
+			sp_reg--;
 			break;
 		case PLA:
+			a_reg = ram->read(0x01, sp_reg);
+			sp_reg++;
+			increment_pc();
 			break;
 		case PLP:
+			flags.val = ram->read(0x01, sp_reg) & 0xCF;
+			sp_reg++;
+			increment_pc();
 			break;
-		case ROL:
+		case ROL:{
+			unsigned char operand = 0x00;
+			unsigned char addr_low = 0x00;
+			unsigned char addr_high = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
 			case ABSOLUT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(pc_high, pc_low);
 				break;
 			case INDIRECT_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr_low -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += x_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case INDIRECT_Y:
-				break;
-			case RELATIV:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr_low -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += y_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low + x_reg);
 				break;
 			case ZEROPAGE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low + y_reg);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
+			increment_pc();
+		}
 			break;
-		case ROR:
+		case ROR: {
+			unsigned char operand = 0x00;
+			unsigned char addr_low = 0x00;
+			unsigned char addr_high = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
 			case ABSOLUT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(pc_high, pc_low);
 				break;
 			case INDIRECT_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr_low -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += x_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case INDIRECT_Y:
-				break;
-			case RELATIV:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr_low -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += y_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low + x_reg);
 				break;
 			case ZEROPAGE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low + y_reg);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
+			increment_pc();
+		}
 			break;
 		case RTI:
+			flags.val = ram->read(0x01, sp_reg) & 0xCF;
+			sp_reg++;
+			pc_low = ram->read(0x01, sp_reg);
+			sp_reg++;
+			pc_high = ram->read(0x01, sp_reg);
+			sp_reg++;
 			break;
 		case RTS:
+			pc_low = ram->read(0x01, sp_reg);
+			sp_reg++;
+			pc_high = ram->read(0x01, sp_reg);
+			sp_reg++;
 			break;
-		case SBC:
+		case SBC: {
+			unsigned char operand = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
@@ -1252,123 +2252,481 @@ void Processor::execute() {
 				state = JAMMED; //jam the processor
 				break;
 			}
+			//do the subtraction...I may be missing something slightly here, but I think it should work
+			if ((operand & 0x80) > 0) {
+				if ((a_reg & 0x80) > 0) {
+					a_reg = a_reg + (operand & 0x7F);
+				}
+				else {
+					if ((int)a_reg + (operand & 0x7F) > 0xFF) {
+						flags.o_flag = 0b1;
+					}
+					else {
+						flags.o_flag = 0b0;
+					}
+				}
+			}
+			else {
+				if ((a_reg & 0x80) > 0){
+					
+				}
+			}
+			if (a_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			else {
+				flags.z_flag = 0b0;
+			}
+			if ((a_reg & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag = 0b0;
+			}
+		}
 			break;
 		case SEC:
+			flags.c_flag = 0b1;
+			increment_pc();
 			break;
 		case SED:
+			flags.d_flag = 0b1;
+			increment_pc();
 			break;
 		case SEI:
+			flags.id_flag = 0b1;
+			increment_pc();
 			break;
-		case STA:
+		case STA: {
+			unsigned char operand = 0x00;
+			unsigned char addr_low = 0x00;
+			unsigned char addr_high = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
 			case ABSOLUT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(pc_high, pc_low);
 				break;
 			case INDIRECT_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr_low -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += x_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case INDIRECT_Y:
-				break;
-			case RELATIV:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr_low -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += y_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low + x_reg);
 				break;
 			case ZEROPAGE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low + y_reg);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
+			increment_pc();
+			ram->write(addr_high, addr_low, a_reg);
+		}
+			break; {
+				unsigned char operand = 0x00;
+				unsigned char addr_low = 0x00;
+				unsigned char addr_high = 0x00;
+				switch (addr_mode) {
+				case ACCUMULATOR:
+					break;
+				case ABSOLUT:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					increment_pc();
+					addr_high = rom->read(pc_high, pc_low);
+					operand = ram->read(addr_high, addr_low);
+					break;
+				case ABSOLUTE_X:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					increment_pc();
+					addr_high = rom->read(pc_high, pc_low);
+					if (x_reg >= 0x80) {
+						if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+							addr_high--;
+							addr_low = addr_low - ((x_reg & 0x7F) + 1);
+						}
+						else {
+							addr_low = addr_low - ((x_reg & 0x7F) + 1);
+						}
+					}
+					else {
+						if ((int)addr_low + x_reg > 0xFF) {
+							addr_high++;
+							addr_low = addr_low + x_reg;
+						}
+						else {
+							addr_low = addr_low + x_reg;
+						}
+					}
+					operand = ram->read(addr_high, addr_low);
+					break;
+				case ABSOLUTE_Y:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					increment_pc();
+					addr_high = rom->read(pc_high, pc_low);
+					if (x_reg >= 0x80) {
+						if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+							addr_high--;
+							addr_low = addr_low - ((y_reg & 0x7F) + 1);
+						}
+						else {
+							addr_low = addr_low - ((y_reg & 0x7F) + 1);
+						}
+					}
+					else {
+						if ((int)addr_low + y_reg > 0xFF) {
+							addr_high++;
+							addr_low = addr_low + y_reg;
+						}
+						else {
+							addr_low = addr_low + y_reg;
+						}
+					}
+					operand = ram->read(addr_high, addr_low);
+					break;
+				case IMMEDIATE:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					increment_pc();
+					addr_high = rom->read(pc_high, pc_low);
+					operand = ram->read(pc_high, pc_low);
+					break;
+				case INDIRECT_X:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					if (x_reg >= 0x80) {
+						addr_low -= ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low += x_reg;
+					}
+					operand = ram->read(0x00, addr_low);
+					break;
+				case INDIRECT_Y:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					if (y_reg >= 0x80) {
+						addr_low -= ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low += y_reg;
+					}
+					operand = ram->read(0x00, addr_low);
+					break;
+				case ZEROPAGE:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					operand = ram->read(0x00, addr_low);
+					break;
+				case ZEROPAGE_X:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low);
+					operand = ram->read(0x00, addr_low + x_reg);
+					break;
+				case ZEROPAGE_Y:
+					increment_pc();
+					addr_low = rom->read(pc_high, pc_low + y_reg);
+					operand = ram->read(0x00, addr_low);
+					break;
+				case ERR:
+					state = JAMMED; //jam the processor
+					break;
+				}
+				increment_pc();
+				ram->write(addr_high, addr_low, x_reg);
+			}
 			break;
-		case STX:
+		case STY: {
+			unsigned char operand = 0x00;
+			unsigned char addr_low = 0x00;
+			unsigned char addr_high = 0x00;
 			switch (addr_mode) {
 			case ACCUMULATOR:
 				break;
 			case ABSOLUT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((x_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((x_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + x_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + x_reg;
+					}
+					else {
+						addr_low = addr_low + x_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case ABSOLUTE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					if ((int)(addr_low - ((y_reg & 0x7F) + 0x01)) < 0) {
+						addr_high--;
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+					else {
+						addr_low = addr_low - ((y_reg & 0x7F) + 1);
+					}
+				}
+				else {
+					if ((int)addr_low + y_reg > 0xFF) {
+						addr_high++;
+						addr_low = addr_low + y_reg;
+					}
+					else {
+						addr_low = addr_low + y_reg;
+					}
+				}
+				operand = ram->read(addr_high, addr_low);
 				break;
 			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				increment_pc();
+				addr_high = rom->read(pc_high, pc_low);
+				operand = ram->read(pc_high, pc_low);
 				break;
 			case INDIRECT_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (x_reg >= 0x80) {
+					addr_low -= ((x_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += x_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case INDIRECT_Y:
-				break;
-			case RELATIV:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				if (y_reg >= 0x80) {
+					addr_low -= ((y_reg & 0x7F) + 1);
+				}
+				else {
+					addr_low += y_reg;
+				}
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ZEROPAGE_X:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low);
+				operand = ram->read(0x00, addr_low + x_reg);
 				break;
 			case ZEROPAGE_Y:
+				increment_pc();
+				addr_low = rom->read(pc_high, pc_low + y_reg);
+				operand = ram->read(0x00, addr_low);
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
 				break;
 			}
-			break;
-		case STY:
-			switch (addr_mode) {
-			case ACCUMULATOR:
-				break;
-			case ABSOLUT:
-				break;
-			case ABSOLUTE_X:
-				break;
-			case ABSOLUTE_Y:
-				break;
-			case IMMEDIATE:
-				break;
-			case IMPLIED:
-				break;
-			case INDIRECT:
-				break;
-			case INDIRECT_X:
-				break;
-			case INDIRECT_Y:
-				break;
-			case RELATIV:
-				break;
-			case ZEROPAGE:
-				break;
-			case ZEROPAGE_X:
-				break;
-			case ZEROPAGE_Y:
-				break;
-			case ERR:
-				state = JAMMED; //jam the processor
-				break;
-			}
+			increment_pc();
+			ram->write(addr_high, addr_low, y_reg);
+		}
 			break;
 		case TAX:
+			x_reg = a_reg;
+			if (x_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			else {
+				flags.z_flag = 0b0;
+			}
+			if ((x_reg & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag - 0b0;
+			}
+			increment_pc();
 			break;
 		case TAY:
+			y_reg = a_reg;
+			if (y_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			else {
+				flags.z_flag = 0b0;
+			}
+			if ((y_reg & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag - 0b0;
+			}
+			increment_pc();
 			break;
 		case TSX:
+			x_reg = sp_reg;
+			if (x_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			else {
+				flags.z_flag = 0b0;
+			}
+			if ((x_reg & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag - 0b0;
+			}
+			increment_pc();
 			break;
 		case TXA:
+			a_reg = x_reg;
+			if (a_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			else {
+				flags.z_flag = 0b0;
+			}
+			if ((a_reg & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag - 0b0;
+			}
+			increment_pc();
 			break;
 		case TXS:
+			sp_reg = x_reg;
+			increment_pc();
 			break;
 		case TYA:
+			a_reg = y_reg;
+			if (a_reg == 0x00) {
+				flags.z_flag = 0b1;
+			}
+			else {
+				flags.z_flag = 0b0;
+			}
+			if ((a_reg & 0x80) > 0) {
+				flags.n_flag = 0b1;
+			}
+			else {
+				flags.n_flag - 0b0;
+			}
+			increment_pc();
 			break;
 		case JAM:
 			state = JAMMED; //jam the processor state

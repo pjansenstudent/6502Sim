@@ -377,6 +377,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 SetWindowText(pch_readout, pchString);
                 SetWindowText(pcl_readout, pclString);
                 SetWindowText(output_readout, outString);
+
+                //set flags
+                SetWindowText(f_n_label, flgString[0] + L"");
+                SetWindowText(f_v_label, flgString[1] + L"");
+                SetWindowText(f_b_label, flgString[3] + L"");
+                SetWindowText(f_d_label, flgString[4] + L"");
+                SetWindowText(f_i_label, flgString[5] + L"");
+                SetWindowText(f_z_label, flgString[6] + L"");
+                SetWindowText(f_c_label, flgString[7] + L"");
                 
                 //RAM viewing updating
                 ReadMemoryContents(true, emu_cpu->get_ram_size(), ramValues);
