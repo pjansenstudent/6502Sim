@@ -211,17 +211,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             //setup register readouts
         a_label = CreateWindow(L"Static", L"Accumulator:", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 20, 85, 20, hWnd, (HMENU)1, NULL, NULL);
-        a_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 20, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+        a_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 20, 75, 20, hWnd, (HMENU)1, NULL, NULL);
         x_label = CreateWindow(L"Static", L"X Register: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 50, 85, 20, hWnd, (HMENU)1, NULL, NULL);
-        x_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 50, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+        x_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 50, 75, 20, hWnd, (HMENU)1, NULL, NULL);
         y_label = CreateWindow(L"Static", L"Y Register: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 80, 85, 20, hWnd, (HMENU)1, NULL, NULL);
-        y_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 80, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+        y_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 120, 80, 75, 20, hWnd, (HMENU)1, NULL, NULL);
         pch_label = CreateWindow(L"Static", L"PC High:", WS_CHILD | WS_VISIBLE | SS_LEFT, 200, 20, 85, 20, hWnd, (HMENU)1, NULL, NULL);
-        pch_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 20, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+        pch_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 20, 75, 20, hWnd, (HMENU)1, NULL, NULL);
         pcl_label = CreateWindow(L"Static", L"PC Low: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 200, 50, 85, 20, hWnd, (HMENU)1, NULL, NULL);
-        pcl_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 50, 65, 20, hWnd, (HMENU)1, NULL, NULL);
-        sp_label = CreateWindow(L"Static", L"Stack Point: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 200, 80, 85, 20, hWnd, (HMENU)1, NULL, NULL);
-        sp_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 80, 65, 20, hWnd, (HMENU)1, NULL, NULL);
+        pcl_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 50, 75, 20, hWnd, (HMENU)1, NULL, NULL);
+        sp_label = CreateWindow(L"Static", L"Stack Point: ", WS_CHILD | WS_VISIBLE | SS_LEFT, 200, 80, 75, 20, hWnd, (HMENU)1, NULL, NULL);
+        sp_reg_readout = CreateWindow(L"Static", L"00000000", WS_CHILD | WS_VISIBLE | SS_LEFT, 320, 80, 75, 20, hWnd, (HMENU)1, NULL, NULL);
         f_label = CreateWindow(L"Static", L"Flags", WS_CHILD | WS_VISIBLE | SS_CENTER, 160, 120, 65, 20, hWnd, (HMENU)1, NULL, NULL);
         rom_label = CreateWindow(L"Static", L"ROM Contents", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 260, 120, 20, hWnd, (HMENU)1, NULL, NULL);
         rom_viewer = CreateWindowEx(0, L"EDIT", L"00000000 00000000 00000000", WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL, 20, 280, 160, 220, hWnd, (HMENU)1, NULL, NULL); //multi line edit control should allow me to create a large input box, hopefully it will allow text content of sufficient length
@@ -283,7 +283,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                             PWSTR file_path;
                             file_result = pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path); //note, this will crash if you click cancel at the moment, as I do no have the check for success
 
-                            MessageBoxW(NULL, file_path, L"File Path", MB_OK); //simple message box for testing purposeshb
+                            //MessageBoxW(NULL, file_path, L"File Path", MB_OK); //simple message box for testing purposeshb
                             std::string temppath;
                             std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> convert;
                             temppath = convert.to_bytes(file_path);
@@ -295,10 +295,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                             //finally, enable the step button
                             EnableWindow(step_button, true);
                             CoTaskMemFree(file_path);
+                            pItem->Release();
                         }
-                        
-
-                        pItem->Release();
                     }
                     pFileOpen->Release();
                 }
@@ -306,6 +304,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                 //set the rom text
                 wchar_t* romstring = new wchar_t[(emu_cpu->get_rom_size() * 8) + emu_cpu->get_rom_size()];
+                for (int i = 0; i < (emu_cpu->get_rom_size() * 8) + emu_cpu->get_rom_size(); i++) {
+                    romstring[i] = L' ';
+                }
                 ReadMemoryContents(false, emu_cpu->get_rom_size(), romstring);
                 SetWindowText(rom_viewer, romstring);
                 delete[] romstring; //clear memory
@@ -318,7 +319,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 break;
             case ID_STEPBUTTON: {
                 //do button stuff here
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_TESTDIALOG), hWnd, TestDialog); //button testing procedure, actual processing to follow
+                //DialogBox(hInst, MAKEINTRESOURCE(IDD_TESTDIALOG), hWnd, TestDialog); //button testing procedure, actual processing to follow
                 //perform STEP function on processor
                 emu_cpu->step();
 
@@ -358,6 +359,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 for (int i = 0; i < 8; i++) {
                     spString[i] = L'0';
                 }
+                for (int i = 0; i < (emu_cpu->get_ram_size() * 8) + emu_cpu->get_ram_size(); i++) {
+                    ramValues[i] = L' ';
+                }
 
                 //convert the values of the unsigned chars to our bitstrings
                 ConvertToBinString(emu_cpu->get_accumulator(), accString);
@@ -379,16 +383,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 SetWindowText(output_readout, outString);
 
                 //set flags
-                SetWindowText(f_n_label, flgString[0] + L"");
-                SetWindowText(f_v_label, flgString[1] + L"");
-                SetWindowText(f_b_label, flgString[3] + L"");
-                SetWindowText(f_d_label, flgString[4] + L"");
-                SetWindowText(f_i_label, flgString[5] + L"");
-                SetWindowText(f_z_label, flgString[6] + L"");
-                SetWindowText(f_c_label, flgString[7] + L"");
+                SetWindowText(f_n_readout, flgString[0] + L" ");
+                SetWindowText(f_v_readout, flgString[1] + L" ");
+                SetWindowText(f_b_readout, flgString[3] + L" ");
+                SetWindowText(f_d_readout, flgString[4] + L" ");
+                SetWindowText(f_i_readout, flgString[5] + L" ");
+                SetWindowText(f_z_readout, flgString[6] + L" ");
+                SetWindowText(f_c_readout, flgString[7] + L" ");
                 
                 //RAM viewing updating
                 ReadMemoryContents(true, emu_cpu->get_ram_size(), ramValues);
+                SetWindowText(ram_viewer, ramValues);
                 
                 //delete the variables used
                 delete[] accString;
@@ -501,10 +506,13 @@ INT_PTR CALLBACK TestDialog(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 /// <returns></returns>
 void ConvertToBinString(unsigned char value, wchar_t* output) {
     char binValue[8] = { '0','0','0','0','0','0','0','0'};
-    for (int i = 7; i >= 0; i--) {
+    for (int i = 7; i > -1; i--) {
         if (value >> i & 1) {
             binValue[i] = '1';
-            output[i] = L'1';
+            output[7 - i] = L'1';
+        }
+        else {
+            output[7 - i] = L'0';
         }
     }
 }
@@ -515,7 +523,7 @@ void ReadMemoryContents(bool ramRom, unsigned int memSize, wchar_t* output) {
     unsigned int wCharTracker = 0;
     addr_breaker addr;
     addr.full = 0x0000; //set the address to full
-    if (ramRom) {
+    if (ramRom == true) {
         //operate on the RAM
         for (unsigned int i = 0; i < memSize; i++) {
             ConvertToBinString(emu_cpu->get_ram_value(addr.high, addr.low), &output[wCharTracker]); //hopefully passing the address of + wcharTracker will work 

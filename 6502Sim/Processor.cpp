@@ -131,8 +131,8 @@ void Processor::fetch() {
 void Processor::decode() {
 	if (state == DECODE) {
 		//parse the function
-		inst = instruction_table[curr_instruction.nib_high][curr_instruction.nib_low];
-		addr_mode = address_table[curr_instruction.nib_high][curr_instruction.nib_low];
+		inst = instruction_table[curr_instruction.nib_low][curr_instruction.nib_high];
+		addr_mode = address_table[curr_instruction.nib_low][curr_instruction.nib_high];
 
 		state = EXECUTE;
 	}
@@ -1342,7 +1342,6 @@ void Processor::execute() {
 				break;
 		case LDA:
 		{
-			increment_pc();
 			unsigned char operand;
 			switch (addr_mode) {
 			case ACCUMULATOR:
@@ -2868,5 +2867,5 @@ unsigned char Processor::get_rom_value(unsigned char offsetHigh, unsigned char o
 
 
 unsigned char Processor::get_ram_value(unsigned char offsetHigh, unsigned char offsetLow) {
-	return rom->read(offsetHigh, offsetLow);
+	return ram->read(offsetHigh, offsetLow);
 }
