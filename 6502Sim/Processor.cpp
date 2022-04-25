@@ -309,7 +309,7 @@ void Processor::execute() {
 				a_reg += operand; //do the addition for the actual value in the accumulator
 
 				//checks for n and z flags
-				if (a_reg = 0x00) {
+				if (a_reg == 0x00) {
 					flags.z_flag = 0b1;
 				}
 				if ((a_reg & 0x80) > 0x00) {
@@ -2393,16 +2393,19 @@ void Processor::execute() {
 				increment_pc();
 				addr_low = rom->read(pc_high, pc_low);
 				operand = ram->read(0x00, addr_low);
+				addr_low = operand;
 				break;
 			case ZEROPAGE_X:
 				increment_pc();
 				addr_low = rom->read(pc_high, pc_low);
-				operand = ram->read(0x00, addr_low + x_reg);
+				operand = ram->read(0x00, addr_low);
+				addr_low = operand + x_reg;
 				break;
 			case ZEROPAGE_Y:
 				increment_pc();
-				addr_low = rom->read(pc_high, pc_low + y_reg);
+				addr_low = rom->read(pc_high, pc_low);
 				operand = ram->read(0x00, addr_low);
+				addr_low = operand + y_reg;
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
@@ -2508,16 +2511,19 @@ void Processor::execute() {
 					increment_pc();
 					addr_low = rom->read(pc_high, pc_low);
 					operand = ram->read(0x00, addr_low);
+					addr_low = operand;
 					break;
 				case ZEROPAGE_X:
 					increment_pc();
 					addr_low = rom->read(pc_high, pc_low);
-					operand = ram->read(0x00, addr_low + x_reg);
+					operand = ram->read(0x00, addr_low);
+					addr_low = operand + x_reg;
 					break;
 				case ZEROPAGE_Y:
 					increment_pc();
-					addr_low = rom->read(pc_high, pc_low + y_reg);
+					addr_low = rom->read(pc_high, pc_low);
 					operand = ram->read(0x00, addr_low);
+					addr_low = operand + y_reg;
 					break;
 				case ERR:
 					state = JAMMED; //jam the processor
@@ -2624,16 +2630,19 @@ void Processor::execute() {
 				increment_pc();
 				addr_low = rom->read(pc_high, pc_low);
 				operand = ram->read(0x00, addr_low);
+				addr_low = operand;
 				break;
 			case ZEROPAGE_X:
 				increment_pc();
 				addr_low = rom->read(pc_high, pc_low);
-				operand = ram->read(0x00, addr_low + x_reg);
+				operand = ram->read(0x00, addr_low);
+				addr_low = operand + x_reg;
 				break;
 			case ZEROPAGE_Y:
 				increment_pc();
-				addr_low = rom->read(pc_high, pc_low + y_reg);
+				addr_low = rom->read(pc_high, pc_low);
 				operand = ram->read(0x00, addr_low);
+				addr_low = operand + y_reg;
 				break;
 			case ERR:
 				state = JAMMED; //jam the processor
@@ -2794,11 +2803,14 @@ void Processor::load_program(const char* filepath) {
 	unsigned char byte_read = 0x00;
 	std::ifstream input_file_stream;
 	input_file_stream.open(filepath); //open the file from the resulting filepalth, I'll likely put this in a try-catch block at some point
+	//byte_read = input_file_stream.get();
 
 	//read each byte and input it into 
 	while (!input_file_stream.eof()) {
+	//while (byte_read != 0x11){
 		byte_read = input_file_stream.get();
 		rom->write(itr.high, itr.low, byte_read);
+		//byte_read = input_file_stream.get();
 		itr.full++;
 	}
 }
